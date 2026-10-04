@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   :root{
@@ -759,7 +760,7 @@
         <div style="font-size:12.5px;font-weight:700;color:var(--muted);margin-top:6px;">Payment Mode</div>
         <div class="mode-row">
           <div class="mode-tile selected" id="mode-NEFT" onclick="selectMode('NEFT')">NEFT<div class="sub">Within 4 hrs</div></div>
-          <div class="mode-tile" id="mode-UPI" onclick="selectMode('UPI')">UPI<div class="sub">No cost</div></div>
+          <div class="mode-tile" id="mode-RTGS" onclick="selectMode('RTGS')">RTGS<div class="sub">Same day</div></div>
           <div class="mode-tile" id="mode-IMPS" onclick="selectMode('IMPS')">IMPS<span class="tag">Instant</span></div>
         </div>
 
@@ -1113,15 +1114,7 @@
       return;
     }
     document.getElementById('insufficientError').style.display = 'none';
-    if(selectedMode === 'UPI'){
-      pinEntry = '';
-      updatePinDots();
-      document.getElementById('pinAmountDisplay').textContent = amt.toLocaleString('en-IN');
-      document.getElementById('pinPayeeDisplay').textContent = getPayeeName();
-      goToStep('pin');
-    } else {
-      startProcessing();
-    }
+    startProcessing();
   }
 
   function updatePinDots(){
@@ -1139,7 +1132,7 @@
   }
 
   function startProcessing(){
-    const modeLabelMap = { NEFT:'Processing via NEFT…', UPI:'Verifying with UPI…', IMPS:'Processing via IMPS…' };
+    const modeLabelMap = { NEFT:'Processing via NEFT…', RTGS:'Processing via RTGS…', IMPS:'Processing via IMPS…' };
     document.getElementById('processingModeText').textContent = modeLabelMap[selectedMode];
     goToStep('processing');
     setTimeout(()=> finishPayment(), 1400);
@@ -1209,34 +1202,136 @@
   /* ---------------- PDF: statement / FD summary / receipt ---------------- */
   function downloadStatement(){
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    doc.setFontSize(16); doc.setTextColor(36,85,230);
-    doc.text('HDFC Bank — Account Statement', 14, 18);
-    doc.setTextColor(15,27,51); doc.setFontSize(10);
-    doc.text('Name: SKYLINE BUILDERS & DEVELOPERS', 14, 30);
-    doc.text('Account: 59209609819999 (Biz Pro Plus)', 14, 36);
-    doc.text('Branch: BENACHITY', 14, 42);
-    doc.text('Period: 01 Apr 2026 – 04 Oct 2026', 14, 48);
-    doc.setDrawColor(220); doc.line(14,54,196,54);
-    doc.setFontSize(11);
-    doc.text('Date', 14, 62); doc.text('Narration', 40, 62); doc.text('Debit', 120, 62); doc.text('Credit', 150, 62);
-    doc.line(14,66,196,66);
+    const doc = new jsPDF('p', 'pt', 'a4');
+    
+    // 1. Logo
+    const logoData = document.querySelector('.brand-mark img').src;
+    doc.addImage(logoData, 'PNG', 30, 30, 160, 36);
+
+    // 2. Customer Info (Left Box)
+    doc.setLineWidth(1);
+    doc.rect(30, 80, 250, 130);
     doc.setFontSize(9);
-    let y = 74;
-    const txns = [
-      ['04 Oct', 'IMPS Credit — RAJESH KUMAR', '', '1,20,000.00'],
-      ['28 Sep', 'NEFT Credit — TATA PROJECTS LTD', '', '5,50,000.00'],
-      ['20 Apr', 'NEFT Credit — DDA CONTRACT ADVANCE', '', '3,25,000.00'],
-      ['12 Apr', 'NEFT to ULTRATECH CEMENT LTD', '1,87,500.00', '']
-    ];
-    txns.forEach(t => {
-      doc.text(t[0], 14, y); doc.text(t[1], 40, y); doc.text(t[2], 120, y); doc.text(t[3], 150, y);
-      y += 8;
+    doc.setFont("times", "normal");
+    doc.text("SKYLINE BUILDERS & DEVELOPERS", 35, 95);
+    doc.text("NACHAN ROAD, OLD DUTTA AUTOMOBILE", 35, 107);
+    doc.text("BUILDING, BENACHITY", 35, 119);
+    doc.text("DURGAPUR 713213", 35, 131);
+    doc.text("WEST BENGAL INDIA", 35, 143);
+    doc.text("JOINT HOLDERS :", 35, 167);
+    doc.line(30, 175, 280, 175);
+    doc.text("Nomination : Registered", 35, 187);
+
+    // 3. Account Details (Right Box)
+    const rightX = 300;
+    const rightValX = 380;
+    let rY = 85;
+    const lH = 10;
+    doc.text("Account Branch", rightX, rY); doc.text(": BENACHITY", rightValX, rY); rY += lH;
+    doc.text("Address", rightX, rY); doc.text(": NACHAN ROAD, OLD DUTTA", rightValX, rY); rY += lH;
+    doc.text("", rightX, rY); doc.text("  AUTOMOBILE BUILDING", rightValX, rY); rY += lH;
+    doc.text("City", rightX, rY); doc.text(": DURGAPUR 713213", rightValX, rY); rY += lH;
+    doc.text("State", rightX, rY); doc.text(": WEST BENGAL", rightValX, rY); rY += lH;
+    doc.text("Phone no.", rightX, rY); doc.text(": 18002600 / 18001600", rightValX, rY); rY += lH;
+    doc.text("OD Limit", rightX, rY); doc.text(": 0.00", rightValX, rY); rY += lH;
+    doc.text("Currency", rightX, rY); doc.text(": INR", rightValX, rY); rY += lH;
+    doc.text("Email", rightX, rY); doc.text(": ROYDIBYENDU841@GMAIL.COM", rightValX, rY); rY += lH;
+    doc.text("Cust ID", rightX, rY); doc.text(": 62393867", rightValX, rY); rY += lH;
+    doc.text("Account No", rightX, rY); doc.text(": 59209609819999    OTHER", rightValX, rY); rY += lH;
+    doc.text("A/C Open Date", rightX, rY); doc.text(": 30/09/2020", rightValX, rY); rY += lH;
+    doc.text("Account Status", rightX, rY); doc.text(": Regular", rightValX, rY); rY += lH;
+    doc.text("RTGS/NEFT IFSC", rightX, rY); doc.text(": HDFC0001275       MICR : 713240002", rightValX, rY); rY += lH;
+    doc.text("Branch Code", rightX, rY); doc.text(": 1275              Product Code : 114", rightValX, rY);
+
+    // 4. Statement Period
+    doc.setFontSize(12);
+    doc.text("Statement of account", 300, 250);
+    doc.setFontSize(9);
+    doc.text("From : 01/04/2026", 30, 265);
+    doc.text("To : 04/10/2026", 150, 265);
+
+    // 5. Table
+    doc.autoTable({
+      startY: 270,
+      theme: 'grid',
+      headStyles: { fillColor: [224, 247, 250], textColor: [0, 0, 0], fontStyle: 'normal', lineColor: [120, 180, 180], lineWidth: 0.5 },
+      bodyStyles: { textColor: [0, 0, 0], lineColor: [120, 180, 180], lineWidth: 0.5 },
+      head: [['Date', 'Narration', 'Chq./Ref.No', 'Value Dt', 'Withdrawal Amt.', 'Deposit Amt.', 'Closing Balance']],
+      body: [
+        ['12/04/26', 'NEFT to ULTRATECH CEMENT LTD', 'N12345678', '12/04/26', '1,87,500.00', '', '90,04,999.00'],
+        ['20/04/26', 'NEFT Credit — DDA CONTRACT ADVANCE', 'N87654321', '20/04/26', '', '3,25,000.00', '93,29,999.00'],
+        ['28/09/26', 'NEFT Credit — TATA PROJECTS LTD', 'N11223344', '28/09/26', '', '5,50,000.00', '98,79,999.00'],
+        ['04/10/26', 'IMPS Credit — RAJESH KUMAR', 'I99887766', '04/10/26', '', '1,20,000.00', '99,99,999.00']
+      ],
+      columnStyles: {
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+        6: { halign: 'right' }
+      },
+      styles: { fontSize: 8, font: 'times', cellPadding: 3, textColor: [0, 0, 0] }
     });
-    doc.line(14, y, 196, y);
-    y += 8;
+
+    // 6. Summary
+    let fY = doc.lastAutoTable.finalY + 30;
     doc.setFontSize(10);
-    doc.text('Closing Balance: Rs 99,99,999.00', 14, y);
+    doc.setFont("times", "bold");
+    doc.text("STATEMENT SUMMARY :-", 70, fY);
+    
+    fY += 15;
+    doc.setFontSize(9);
+    doc.text("Opening Balance", 100, fY, {align: 'center'});
+    doc.text("Dr Count", 230, fY, {align: 'center'});
+    doc.text("Cr Count", 290, fY, {align: 'center'});
+    doc.text("Debits", 350, fY, {align: 'center'});
+    doc.text("Credits", 420, fY, {align: 'center'});
+    doc.text("Closing Bal", 490, fY, {align: 'center'});
+    
+    fY += 15;
+    doc.setFont("times", "normal");
+    doc.text("91,92,499.00", 100, fY, {align: 'center'});
+    doc.text("1", 230, fY, {align: 'center'});
+    doc.text("3", 290, fY, {align: 'center'});
+    doc.text("1,87,500.00", 350, fY, {align: 'center'});
+    doc.text("9,95,000.00", 420, fY, {align: 'center'});
+    doc.text("99,99,999.00", 490, fY, {align: 'center'});
+
+    // 7. Middle footer
+    fY += 50;
+    doc.setFontSize(8);
+    const nowStr = new Date().toLocaleString('en-IN', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    doc.setFont("times", "bold");
+    doc.text(`Generated On: ${nowStr}`, 110, fY, {align: 'center'});
+    doc.text("Generated By: 62393867", 290, fY, {align: 'center'});
+    doc.text("Requesting Branch Code: NET", 480, fY, {align: 'center'});
+    
+    fY += 40;
+    doc.setFont("times", "normal");
+    doc.text("This is a computer generated statement and does", 400, fY);
+    doc.text("not require signature.", 400, fY + 10);
+    
+    // 8. Bottom Footer
+    let botY = doc.internal.pageSize.getHeight() - 60;
+    doc.setFont("times", "bold");
+    doc.setTextColor(36,85,230);
+    doc.text("HDFC BANK LIMITED", 30, botY);
+    
+    botY += 10;
+    doc.setFont("times", "normal");
+    doc.text("*Closing balance includes funds earmarked for hold and uncleared funds", 30, botY);
+    botY += 10;
+    doc.setTextColor(0, 0, 0);
+    doc.text("Contents of this statement will be considered correct if no error is reported within 30 days of receipt of statement. The address on this statement is that on record with the Bank as at the day of requesting", 30, botY);
+    botY += 10;
+    doc.text("this statement.", 30, botY);
+    botY += 10;
+    doc.setFont("times", "bold");
+    doc.text("State account branch GSTN: 19AAACH2702H1Z0", 30, botY);
+    botY += 10;
+    doc.setFont("times", "normal");
+    doc.text("HDFC Bank GSTIN number details are available at https://www.hdfcbank.com/personal/making-payments/online-tax-payment/goods-and-service-tax.", 30, botY);
+    botY += 10;
+    doc.text("Registered Office Address: HDFC Bank House,Senapati Bapat Marg,Lower Parel,Mumbai 400013", 30, botY);
+
     doc.save('HDFC_Bank_Statement_01Apr-04Oct2026.pdf');
   }
 
